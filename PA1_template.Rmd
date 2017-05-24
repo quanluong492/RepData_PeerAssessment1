@@ -1,25 +1,115 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "Project week 2"
+author: "Quan Luong"
+date: "May 24, 2017"
+output: html_document
 ---
 
+#Q1: Loading and preprocessing the data
+```{r}
+setwd("D:/TIKI/Quan Luong/Coursera/Course 5_Reproducible Research")
+# load raw data
+data <- read.csv("./repdata_data_activity/activity.csv")
+# re-format date 
+data$date <- as.POSIXct(data$date, format="%Y-%m-%d")
+```
 
-## Loading and preprocessing the data
+#Q2: What is mean total number of steps taken per day?
 
+```{r, warning=FALSE, message=FALSE}
+library(dplyr)
+data_na_rm <- na.omit(data)
+data_sum <- data_na_rm %>% 
+            group_by(date) %>% 
+            summarise(sum_step = sum(steps))
+hist(data_sum$sum_step, xlab="Total number of steps", 
+     main="Histogram of the total number of steps taken each day")
+```
 
+```{r, echo=FALSE}
+print(paste0("mean total number of steps taken per day ", round(mean(data_sum$sum_step),2)))
+print(paste0("median total number of steps taken per day ", round(median(data_sum$sum_step),2)))
 
-## What is mean total number of steps taken per day?
+```
 
+#Q3: What is the average daily activity pattern?
 
+```{r}
+library(ggplot2)
+data_interval <- data_na_rm %>% 
+                 group_by(interval) %>% 
+                 summarise(sum_step = sum(steps),
+                           mean_step = mean(steps))
+ggplot(data_interval, aes(interval, sum_step)) + geom_line() + 
+     xlab("interval (minutes)") + 
+     ylab("Average number of steps") + 
+     ggtitle("Time-series of the average number of steps per intervals\n(NA removed)")
+```
 
-## What is the average daily activity pattern?
+```{r, echo=FALSE}
+print(paste0("Averaged number of steps peaks at interval ", data_interval$interval[data_interval$mean_step == max(data_interval$mean_step)]))
+```
 
+#Q4: Imputing missing values
 
+## Report the total number of missing values in the dataset
+```{r, echo=FALSE}
+print(paste0("Total number of missing values in the dataset ",sum(is.na(data))))
+```
 
-## Imputing missing values
+## Filling missing data
+```{r}
+data_na_filled <- data
+data_na_filled$steps <- ifelse(!is.na(data_na_filled$steps), 
+                               data_na_filled$steps, 
+                               ifelse(data_na_filled$interval == data_interval$interval, 
+                                      data_interval$mean_step, 
+                                      0))
+#NA values in steps are replaced by mean steps at relevant interval
+```
 
+## New dataset
+"data_na_filled" is the new dataset with NA values replaced
 
+## New histogram, total steps, mean steps, median steps
+```{r}
+data_na_filled_sum <- data_na_filled %>% 
+                      group_by(date) %>% 
+                      summarise(sum_step = sum(steps))
+hist(data_na_filled_sum$sum_step, xlab="Total number of steps", 
+     main="Histogram of the total number of steps taken each day")
+```
 
-## Are there differences in activity patterns between weekdays and weekends?
+```{r, echo=FALSE}
+print(paste0("mean total number of steps taken per day after imputing missing data ", round(mean(data_na_filled_sum$sum_step),2)))
+print(paste0("median total number of steps taken per day after imputing missing data ", round(median(data_na_filled_sum$sum_step),2)))
+# Filling missing data raises both total steps, mean steps, median steps compared to the previous dataset
+```
+
+# Are there differences in activity patterns between weekdays and weekends?
+## Create a new factor variable in the dataset with two levels – “weekday” and “weekend”
+
+```{r}
+data_na_filled$date_type <- ifelse(tolower(weekdays(data_na_filled$date)) %in% c("saturday", "sunday"),
+                                   "weekend", "weekday")
+```
+
+## Calculate mean and median of total steps by new levels of date type
+
+```{r}
+data_na_filled_sum_wkday <- data_na_filled %>% 
+                            group_by(date_type, interval) %>% 
+                            summarise(mean_step = mean(steps))
+```
+
+```{r}
+library(lattice)
+xyplot(mean_step ~ interval | date_type, data_na_filled_sum_wkday, 
+       type="l", 
+       lwd=1, 
+       xlab="Interval", 
+       ylab="Number of steps", 
+       layout=c(1,2))
+```
+
+knit
